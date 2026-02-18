@@ -1,4 +1,4 @@
-# 🧠 MindMetrics — ML Stress Prediction on STREL
+# MindMetrics — ML Stress Prediction on STREL
 
 **Course:** CSCI 6838 – Spring 2026 Capstone  
 **Team:** Mind Metrics  
