@@ -4,9 +4,9 @@
 **Team:** Mind Metrics  
 
 Predicts binary mental-stress states (Stressed / Not-Stressed) for crisis
-leaders using the [STREL](https://osf.io/qshv7/) dataset. Uses PyTorch for
+leaders using the [STREL](https://osf.io/qshv7/) dataset. Perform
 data preprocessing and implements 4 ML algorithms: Logistic Regression,
-Random Forest, XGBoost (hybrid with PyTorch), and SVM.
+Random Forest, XGBoost, and SVM.
 
 ---
 
@@ -66,7 +66,7 @@ pip install -r requirements.txt
 |---------------------|
 | Logistic Regression |
 | Random Forest       |
-| XGBoost (Hybrid)    |
+| XGBoost             |
 | SVM                 |
 
 
