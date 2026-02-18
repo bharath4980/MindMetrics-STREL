@@ -50,7 +50,7 @@
 | # | Feature | What It Is | ✅ Use or ❌ Skip | Why |
 |---|---------|-----------|------------------|-----|
 | 11 | **HR** | Heart Rate (beats/min) | ✅ **USE** | Core stress indicator. Elevated HR = stress or physical activity. |
-| 12 | **RR** | RR interval - time between heartbeats (seconds) | ✅ **USE** | Needed for HRV analysis. Shows heart rhythm variability. |
+| 12 | **RR** | RR interval - heart rate variability (milli-seconds) | ✅ **USE** | Shows heart rhythm variability. |
 | 13 | **Cadence** | Steps per minute | ✅ **USE** | High cadence during sedentary = micro-movements = stress indicator. |
 | 14 | **Speed** | Movement speed (km/h) | ✅ **USE** | Helps validate sedentary vs active periods. |
 | 15 | **PNSindex** | Parasympathetic index (relaxation) | ✅ **USE** | Measures "rest & digest" system. Positive = relaxed. |
