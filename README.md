@@ -1,4 +1,4 @@
-# 🧠 MindMetrics — ML Stress Prediction on STREL
+# MindMetrics — ML Stress Prediction on STREL
 
 **Course:** CSCI 6838 – Spring 2026 Capstone  
 **Team:** Mind Metrics  
@@ -62,9 +62,9 @@ pip install -r requirements.txt
 
 | Model              | Framework      | Owner |
 |--------------------|----------------|-------|
-| Logistic Regression| scikit-learn   | P1    |
-| Random Forest      | scikit-learn   | P2    |
-| XGBoost            | xgboost        | P3    |
+| Logistic Regression| PyTorch        | P1    |
+| Random Forest      | PyTorch        | P2    |
+| XGBoost            | PyTorch        | P3    |
 | SVM                | PyTorch        | P4    |
 
 ---
