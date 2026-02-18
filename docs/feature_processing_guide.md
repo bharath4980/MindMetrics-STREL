@@ -18,10 +18,10 @@
 
 | # | Feature | What It Is | ✅ Use or ❌ Skip | Why |
 |---|---------|-----------|------------------|-----|
-| 1 | **Participant** | User ID (T001-T025) | ❌ **SKIP** | Only for splitting train/test. Including it would cause data leakage. |
+| 1 | **Participant** | User ID (T001-T025) | ❌ **SKIP** | Only for splitting train/test. |
 | 2 | **Date** | Calendar date | ❌ **SKIP** | Only for sorting/sequencing. Not predictive of stress. |
-| 3 | **Time** | Timestamp | ❌ **SKIP** (extract Hour, Minute first) | Extract temporal features, then drop. Raw timestamp isn't useful. |
-| 4 | **Day** | Type of day (WD1, CD, WD2, ND) | ✅ **USE** | Critical predictor! Critical days have different stress patterns. |
+| 3 | **Time** | Timestamp | ❌ **SKIP** (extract Hour, Minute first) | Extract temporal features like Hour and Minute |
+| 4 | **Day** | Type of day (WD1, CD, WD2, ND) | ✅ **USE** | Main predictor, Critical days have different stress patterns. |
 | 5 | **subDC** | Internal study code | ❌ **SKIP** | Just organizational metadata. No predictive value. |
 
 ---
@@ -56,7 +56,7 @@
 | 15 | **PNSindex** | Parasympathetic index (relaxation) | ✅ **USE** | Measures "rest & digest" system. Positive = relaxed. |
 | 16 | **SNSindex** | Sympathetic index (stress) | ✅ **USE** | Measures "fight or flight" system. >1 = stressed. |
 | 17 | **Stressindex** | Baevskii Stress Index | ❌ **SKIP** | **Reason:** Highly correlated with SNSindex (r=0.91). Redundant. Using both confuses the model. |
-| 18 | **HR_Baseline** | Daily personalized resting HR | ⚠️ **OPTIONAL** | Can help normalize HR, but HR_Normalized is derived from it. Choose one. |
+| 18 | **HR_Baseline** | Daily personalized resting HR | ✅ **USE** | Can help normalize HR, but HR_Normalized is derived from it. Choose one. |
 | 19 | **HR_Normalized** | HR minus HR_Baseline | ❌ **SKIP** | **Reason:** Derived feature (HR - HR_Baseline). Let model learn this relationship itself from HR and HR_Baseline. |
 
 ---
@@ -65,7 +65,7 @@
 
 | # | Feature | What It Is | ✅ Use or ❌ Skip | Why |
 |---|---------|-----------|------------------|-----|
-| 20 | **Activity4** | Type of activity (Work, NonWork, Driving, etc.) | ✅ **USE** (filter first) | **Important:** Filter to keep only Work, NonWork, Driving (sedentary). Then encode. Different activities = different stress contexts. |
+| 20 | **Activity4** | Type of activity (Work, NonWork, Driving, etc.) | ✅ **USE**  | **Important:** Filter to keep only Work, NonWork, Driving (sedentary). Then encode. Different activities = different stress contexts. |
 
 ---
 
@@ -85,12 +85,12 @@
 | # | Feature | What It Is | ✅ Use or ❌ Skip | Why |
 |---|---------|-----------|------------------|-----|
 | 25 | **NHR_Stress** | **PRIMARY TARGET** (S = Stress, NS = No Stress) | 🎯 **TARGET** | **This is what you're predicting!** Do not use as a feature. |
-| 26 | **NHR_S** | % of day stressed (NHR method) | ❌ **SKIP** | Metadata about the target. Would cause data leakage. |
-| 27 | **NHR_NS** | % of day not stressed (NHR method) | ❌ **SKIP** | Metadata about the target. Would cause data leakage. |
+| 26 | **NHR_S** | % of day stressed (NHR method) | ❌ **SKIP** | Metadata about the target. |
+| 27 | **NHR_NS** | % of day not stressed (NHR method) | ❌ **SKIP** | Metadata about the target. |
 | 28 | **NHR_0_2SD** | Threshold value used for labeling | ❌ **SKIP** | Metadata about labeling process. Not a feature. |
 | 29 | **SNS_Stress** | Alternative target (SNS method) | ⚠️ **ALTERNATIVE TARGET** | Only use if comparing methods. Don't use as feature with NHR_Stress. |
-| 30 | **SNS_S** | % stressed (SNS method) | ❌ **SKIP** | Metadata. Would cause leakage. |
-| 31 | **SNS_NS** | % not stressed (SNS method) | ❌ **SKIP** | Metadata. Would cause leakage. |
+| 30 | **SNS_S** | % stressed (SNS method) | ❌ **SKIP** | Metadata. |
+| 31 | **SNS_NS** | % not stressed (SNS method) | ❌ **SKIP** | Metadata. |
 | 32 | **SNSindexThreshold** | Threshold (always 1) | ❌ **SKIP** | Constant value. No predictive information. |
 
 ---
@@ -167,7 +167,7 @@ These **5 features** are categorical and must be converted to numbers:
 21. Agreeableness
 22. Neuroticism
 23. Openness
-24. HR_Baseline (optional)
+24. HR_Baseline 
 
 **Temporal (2) - extract from Time:**
 25. Hour
@@ -187,7 +187,7 @@ These **5 features** are categorical and must be converted to numbers:
 | **HR_Normalized** | Derived from HR & HR_Baseline, let model learn |
 | **Stressindex** | Correlated with SNSindex (r=0.91), redundant |
 | **PA_Activity** | Redundant with PA_Percent + PA_Intensity |
-| **NHR_S, NHR_NS, NHR_0_2SD** | Target metadata, causes data leakage |
+| **NHR_S, NHR_NS, NHR_0_2SD** | Target metadata, might not be needed |
 | **SNS_Stress, SNS_S, SNS_NS, SNSindexThreshold** | Alternative target/metadata |
 | **N_TD** | Correlated with N_MD (r=0.64) |
 | **N_E** | Correlated with N_MD (r=0.61) |
@@ -219,7 +219,7 @@ These **5 features** are categorical and must be converted to numbers:
 │                                                         │
 │  ⚠️ REMEMBER:                                           │
 │     • Filter to sedentary activities FIRST             │
-│     • Split by Participant (prevent leakage)           │
+│     • Split by Participant (to prevent leakage)           │
 │     • Encode all categoricals                          │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
