@@ -23,7 +23,7 @@ def save_splits(train_df, test_df, output_dir):
     print(f"Files saved to {output_dir}")
 
 if __name__ == "__main__":
-    input_path = "../../data/processed/processed_20260218_235530.xlsx"
+    input_path = "../../data/processed/processed_20260219_000215.xlsx"
     output_dir = "../../data/processed"
     
     df = load_processed_data(input_path)
