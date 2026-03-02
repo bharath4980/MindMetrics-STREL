@@ -52,26 +52,32 @@ class ModelEvaluator:
     
     def plot_metrics(self, save_path=None):
         """
-        Plot bar charts comparing all metrics across models
+        Plot grouped bar charts comparing all metrics across models
         
         Args:
             save_path: Path to save the plot (optional)
         """
         df = pd.DataFrame(self.metrics)
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-        
         metrics = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
-        colors = ['steelblue', 'coral', 'green', 'purple']
         
-        for idx, (metric, color) in enumerate(zip(metrics, colors)):
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        colors = ['steelblue', 'coral', 'green', 'purple', 'orange']
+        
+        for idx, metric in enumerate(metrics):
             ax = axes[idx // 2, idx % 2]
-            ax.bar(df['Model'], df[metric], color=color, alpha=0.8)
-            ax.set_ylabel(metric)
-            ax.set_title(f'{metric} Comparison', fontweight='bold')
+            x = range(len(df))
+            bars = ax.bar(x, df[metric], color=[colors[i % len(colors)] for i in x], alpha=0.8)
+            
+            ax.set_ylabel(metric, fontsize=12)
+            ax.set_title(f'{metric} Comparison', fontweight='bold', fontsize=14)
             ax.set_ylim([0, 1])
-            ax.tick_params(axis='x', rotation=45)
-            for i, v in enumerate(df[metric]):
-                ax.text(i, v + 0.02, f'{v:.4f}', ha='center')
+            ax.set_xticks(x)
+            ax.set_xticklabels(df['Model'], rotation=45, ha='right')
+            
+            # Add value labels on bars
+            for i, (bar, v) in enumerate(zip(bars, df[metric])):
+                ax.text(bar.get_x() + bar.get_width()/2, v + 0.02, 
+                       f'{v:.4f}', ha='center', fontsize=10)
         
         plt.tight_layout()
         if save_path:
@@ -145,11 +151,20 @@ if __name__ == "__main__":
         tpr=result['tpr']
     )
     
-    # TODO: Add other models
-    # from logistic_regression_model import train_and_evaluate_lr
-    # result = train_and_evaluate_lr()
-    # evaluator.add_model(result['model_name'], result['accuracy'], result['precision'],
-    #                    result['recall'], result['f1_score'], fpr=result['fpr'], tpr=result['tpr'])
+    # Random Forest
+    from random_forest_model import train_and_evaluate_random_forest
+    result = train_and_evaluate_random_forest()
+    evaluator.add_model(
+        result['model_name'], 
+        result['accuracy'], 
+        result['precision'],
+        result['recall'],
+        result['f1_score'],
+        fpr=result['fpr'], 
+        tpr=result['tpr']
+    )
+    
+    # TODO: Add other models (Logistic Regression, SVM)
     
     evaluator.print_summary()
     evaluator.plot_metrics(save_path="../../results/metrics/model_comparison.png")
