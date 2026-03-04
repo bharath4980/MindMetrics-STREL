@@ -28,7 +28,11 @@ TEST_PATH = BASE_DIR / "../../data/processed/test.xlsx"
 TARGET_COL = "NHR_Stress"  # values: NS / S
 
 
-DROP_COLS = ["Participant", "PA_Activity", "SNS_Stress"]
+DROP_COLS = [
+    "Participant", "PA_Activity", "SNS_Stress",  # ID and alternate labels
+    "NHR_S", "NHR_NS", "NHR_0_2SD",              # Derived from NHR_Stress (leakage)
+    "SNS_S", "SNS_NS", "SNSindexThreshold"       # Derived from SNS_Stress (leakage)
+]
 
 
 def load_and_prepare(path: Path):

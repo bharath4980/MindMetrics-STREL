@@ -19,7 +19,11 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 # PREPROCESSING FUNCTION
 # ─────────────────────────────────────────────
-DROP_COLS = ["Participant", "PA_Activity", "SNS_Stress"]
+DROP_COLS = [
+    "Participant", "PA_Activity", "SNS_Stress",  # ID and alternate labels
+    "NHR_S", "NHR_NS", "NHR_0_2SD",              # Derived from NHR_Stress (leakage)
+    "SNS_S", "SNS_NS", "SNSindexThreshold"       # Derived from SNS_Stress (leakage)
+]
 CAT_COLS = ["Day", "Period", "Profession", "Gender", "Activity4"]
 TARGET = "NHR_Stress"
 

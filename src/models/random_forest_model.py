@@ -47,7 +47,11 @@ def train_and_evaluate_random_forest():
     print("=" * 60)
     
     TARGET_COL = "NHR_Stress"
-    COLUMNS_TO_DROP = ["Participant", "PA_Activity", "SNS_Stress"]
+    COLUMNS_TO_DROP = [
+        "Participant", "PA_Activity", "SNS_Stress",  # ID and alternate labels
+        "NHR_S", "NHR_NS", "NHR_0_2SD",              # Derived from NHR_Stress (leakage)
+        "SNS_S", "SNS_NS", "SNSindexThreshold"       # Derived from SNS_Stress (leakage)
+    ]
     # LEAKAGE_COLS = ["Stressindex"]
     LEAKAGE_COLS = []
     
