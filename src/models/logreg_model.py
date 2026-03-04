@@ -176,7 +176,7 @@ def train_and_evaluate_logistic_regression():
     print("\nConfusion Matrix:\n", cm)
     
     return {
-        'model_name': 'Logistic Regression (PyTorch)',
+        'model_name': 'Logistic Regression',
         'accuracy': acc,
         'precision': prec,
         'recall': rec,

@@ -60,7 +60,7 @@ class ModelEvaluator:
         df = pd.DataFrame(self.metrics)
         metrics = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
         
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 10))
         colors = ['steelblue', 'coral', 'green', 'purple', 'orange']
         
         for idx, metric in enumerate(metrics):
@@ -70,14 +70,14 @@ class ModelEvaluator:
             
             ax.set_ylabel(metric, fontsize=12)
             ax.set_title(f'{metric} Comparison', fontweight='bold', fontsize=14)
-            ax.set_ylim([0, 1])
+            ax.set_ylim([0, 1.1])  # Extra space for labels
             ax.set_xticks(x)
-            ax.set_xticklabels(df['Model'], rotation=45, ha='right')
+            ax.set_xticklabels(df['Model'], rotation=45, ha='right', fontsize=10)
             
             # Add value labels on bars
             for i, (bar, v) in enumerate(zip(bars, df[metric])):
-                ax.text(bar.get_x() + bar.get_width()/2, v + 0.02, 
-                       f'{v:.4f}', ha='center', fontsize=10)
+                ax.text(bar.get_x() + bar.get_width()/2, v + 0.03, 
+                       f'{v:.3f}', ha='center', fontsize=9, fontweight='bold')
         
         plt.tight_layout()
         if save_path:
