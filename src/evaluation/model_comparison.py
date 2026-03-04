@@ -164,7 +164,31 @@ if __name__ == "__main__":
         tpr=result['tpr']
     )
     
-    # TODO: Add other models (Logistic Regression, SVM)
+    # SVM
+    from svm_model import train_svm
+    result = train_svm()
+    evaluator.add_model(
+        result['model_name'], 
+        result['accuracy'], 
+        result['precision'],
+        result['recall'],
+        result['f1_score'],
+        fpr=result['fpr'], 
+        tpr=result['tpr']
+    )
+    
+    # Logistic Regression (PyTorch)
+    from logreg_model import train_and_evaluate_logistic_regression
+    result = train_and_evaluate_logistic_regression()
+    evaluator.add_model(
+        result['model_name'], 
+        result['accuracy'], 
+        result['precision'],
+        result['recall'],
+        result['f1_score'],
+        fpr=result['fpr'], 
+        tpr=result['tpr']
+    )
     
     evaluator.print_summary()
     evaluator.plot_metrics(save_path="../../results/metrics/model_comparison.png")
