@@ -1,13 +1,13 @@
 """
-NHR_Stress Classification Pipeline
-Using XGBoost for prediction
+NHR_Stress Classification using XGBoost
+Trains XGBoost model and evaluates on test data
 Target: NHR_Stress (S = Stress, NS = No Stress)
 """
 
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score, classification_report, confusion_matrix, 
     precision_score, recall_score, f1_score, roc_auc_score, roc_curve
@@ -23,20 +23,18 @@ DROP_COLS = ["Participant", "PA_Activity", "SNS_Stress"]
 CAT_COLS = ["Day", "Period", "Profession", "Gender", "Activity4"]
 TARGET = "NHR_Stress"
 
-def preprocess(df, encoders=None, scaler=None, fit=True):
+def preprocess(df, scaler=None, fit=True):
     """
-    Preprocess data: drop columns, encode categoricals, scale features
+    Preprocess data: drop columns, one-hot encode categoricals, scale features
     
     Args:
         df: Input dataframe
-        encoders: Label encoders for categorical columns
         scaler: StandardScaler for feature scaling
-        fit: Whether to fit encoders/scaler (True for train, False for test)
+        fit: Whether to fit scaler (True for train, False for test)
     
     Returns:
         X: Processed features
         y: Target labels (0=No Stress, 1=Stress)
-        encoders: Fitted label encoders
         scaler: Fitted scaler
     """
     df = df.copy()
@@ -46,16 +44,14 @@ def preprocess(df, encoders=None, scaler=None, fit=True):
     y = (df[TARGET] == "S").astype(int).values
     df.drop(columns=[TARGET], inplace=True)
 
-    # Label encode categoricals
-    if fit:
-        encoders = {}
+    # One-hot encode categoricals
     for col in CAT_COLS:
-        if fit:
-            le = LabelEncoder()
-            df[col] = le.fit_transform(df[col])
-            encoders[col] = le
-        else:
-            df[col] = encoders[col].transform(df[col])
+        if col in df.columns:
+            df[col] = df[col].fillna("Unknown").astype(str)
+    df = pd.get_dummies(df, columns=[c for c in CAT_COLS if c in df.columns], drop_first=False)
+    
+    # Impute missing values
+    df = df.fillna(df.median(numeric_only=True))
 
     X = df.values.astype(np.float32)
 
@@ -66,7 +62,7 @@ def preprocess(df, encoders=None, scaler=None, fit=True):
     else:
         X = scaler.transform(X)
 
-    return X, y, encoders, scaler
+    return X, y, scaler
 
 
 def train_and_evaluate_xgboost():
@@ -96,8 +92,8 @@ def train_and_evaluate_xgboost():
     print("STEP 2: Preprocessing")
     print("=" * 60)
 
-    X_train, y_train, encoders, scaler = preprocess(train_df, fit=True)
-    X_test, y_test, _, _ = preprocess(test_df, encoders=encoders, scaler=scaler, fit=False)
+    X_train, y_train, scaler = preprocess(train_df, fit=True)
+    X_test, y_test, _ = preprocess(test_df, scaler=scaler, fit=False)
 
     print(f"X_train: {X_train.shape}, y_train: {y_train.shape}")
     print(f"X_test: {X_test.shape}, y_test: {y_test.shape}")

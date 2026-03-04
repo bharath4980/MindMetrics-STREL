@@ -48,7 +48,8 @@ def train_and_evaluate_random_forest():
     
     TARGET_COL = "NHR_Stress"
     COLUMNS_TO_DROP = ["Participant", "PA_Activity", "SNS_Stress"]
-    LEAKAGE_COLS = ["Stressindex"]
+    # LEAKAGE_COLS = ["Stressindex"]
+    LEAKAGE_COLS = []
     
     # Drop columns if they exist
     def safe_drop(df, cols):
