@@ -97,7 +97,9 @@ def train_svm():
 
     # Step 2: GroupKFold loop with best params, average metrics
     fold_metrics = []
+    fold_details = []
     last_fpr, last_tpr = None, None
+    total_tn, total_fp, total_fn, total_tp = 0, 0, 0, 0
 
     for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups=groups), 1):
         X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
@@ -124,6 +126,9 @@ def train_svm():
 
         fold_metrics.append((acc, precision, recall, f1, roc_auc))
         last_fpr, last_tpr = fpr, tpr
+        tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+        total_tn += tn; total_fp += fp; total_fn += fn; total_tp += tp
+        fold_details.append({'model': 'SVM', 'fold': fold, 'accuracy': acc, 'precision': precision, 'recall': recall, 'f1_score': f1, 'roc_auc': roc_auc})
 
         print(f"  Fold {fold} — Acc: {acc:.4f} | Prec: {precision:.4f} | Rec: {recall:.4f} | F1: {f1:.4f} | AUC: {roc_auc:.4f}")
 
@@ -144,12 +149,10 @@ def train_svm():
 
     return {
         "model_name": "SVM",
-        "accuracy":   acc,
-        "precision":  precision,
-        "recall":     recall,
-        "f1_score":   f1,
-        "fpr":        last_fpr.tolist(),
-        "tpr":        last_tpr.tolist(),
+        "accuracy": acc, "precision": precision, "recall": recall, "f1_score": f1,
+        "tn": total_tn, "fp": total_fp, "fn": total_fn, "tp": total_tp,
+        "fpr": last_fpr.tolist(), "tpr": last_tpr.tolist(),
+        "fold_details": fold_details,
     }
 
 

@@ -110,6 +110,7 @@ def train_and_evaluate_random_forest():
     gkf = GroupKFold(n_splits=5)
 
     fold_results = []
+    total_tn, total_fp, total_fn, total_tp = 0, 0, 0, 0
 
     for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups=groups), start=1):
         print(f"\nFold {fold}")
@@ -134,6 +135,8 @@ def train_and_evaluate_random_forest():
             auc = np.nan
 
         fpr, tpr, _ = roc_curve(y_test, y_prob)
+        tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+        total_tn += tn; total_fp += fp; total_fn += fn; total_tp += tp
 
         print(f"Accuracy  : {acc:.4f}")
         print(f"Precision : {precision:.4f}")
@@ -142,14 +145,10 @@ def train_and_evaluate_random_forest():
         print(f"ROC-AUC   : {auc:.4f}" if not np.isnan(auc) else "ROC-AUC   : Not defined")
 
         fold_results.append({
-            "fold": fold,
-            "accuracy": acc,
-            "precision": precision,
-            "recall": recall,
-            "f1_score": f1,
-            "roc_auc": auc,
-            "fpr": fpr,
-            "tpr": tpr,
+            "model": "Random Forest", "fold": fold,
+            "accuracy": acc, "precision": precision,
+            "recall": recall, "f1_score": f1, "roc_auc": auc,
+            "fpr": fpr, "tpr": tpr,
         })
 
     # --------------------------------------------------
@@ -161,7 +160,7 @@ def train_and_evaluate_random_forest():
 
     results_df = pd.DataFrame(fold_results)
 
-    print(results_df)
+    print(results_df[['model', 'fold', 'accuracy', 'precision', 'recall', 'f1_score', 'roc_auc']])
 
     print("\nAverage Performance:")
     print(f"Accuracy  : {results_df['accuracy'].mean():.4f}")
@@ -172,12 +171,11 @@ def train_and_evaluate_random_forest():
 
     return {
         "model_name": "Random Forest",
-        "accuracy":   results_df["accuracy"].mean(),
-        "precision":  results_df["precision"].mean(),
-        "recall":     results_df["recall"].mean(),
-        "f1_score":   results_df["f1_score"].mean(),
-        "fpr":        fold_results[-1]["fpr"].tolist(),
-        "tpr":        fold_results[-1]["tpr"].tolist(),
+        "accuracy": results_df["accuracy"].mean(), "precision": results_df["precision"].mean(),
+        "recall": results_df["recall"].mean(), "f1_score": results_df["f1_score"].mean(),
+        "tn": total_tn, "fp": total_fp, "fn": total_fn, "tp": total_tp,
+        "fpr": fold_results[-1]["fpr"].tolist(), "tpr": fold_results[-1]["tpr"].tolist(),
+        "fold_details": [{k: v for k, v in f.items() if k not in ("fpr", "tpr")} for f in fold_results],
     }
 
 

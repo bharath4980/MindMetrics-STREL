@@ -93,7 +93,9 @@ def train_and_evaluate_xgboost():
     groups = df["Participant"].values
 
     fold_metrics = []
+    fold_details = []
     last_fpr, last_tpr = None, None
+    total_tn, total_fp, total_fn, total_tp = 0, 0, 0, 0
 
     param_grid = {
         "n_estimators": [100, 200],
@@ -137,6 +139,9 @@ def train_and_evaluate_xgboost():
 
         fold_metrics.append((acc, precision, recall, f1, auc))
         last_fpr, last_tpr = fpr, tpr
+        tn, fp, fn, tp = confusion_matrix(y_test, y_preds).ravel()
+        total_tn += tn; total_fp += fp; total_fn += fn; total_tp += tp
+        fold_details.append({'model': 'XGBoost', 'fold': fold, 'accuracy': acc, 'precision': precision, 'recall': recall, 'f1_score': f1, 'roc_auc': auc})
 
         print(f"Fold {fold} — Acc: {acc:.4f} | Prec: {precision:.4f} | Rec: {recall:.4f} | F1: {f1:.4f} | AUC: {auc:.4f}")
 
@@ -161,12 +166,10 @@ def train_and_evaluate_xgboost():
 
     return {
         'model_name': 'XGBoost',
-        'accuracy': acc,
-        'precision': precision,
-        'recall': recall,
-        'f1_score': f1,
-        'fpr': last_fpr.tolist(),
-        'tpr': last_tpr.tolist()
+        'accuracy': acc, 'precision': precision, 'recall': recall, 'f1_score': f1,
+        'tn': total_tn, 'fp': total_fp, 'fn': total_fn, 'tp': total_tp,
+        'fpr': last_fpr.tolist(), 'tpr': last_tpr.tolist(),
+        'fold_details': fold_details
     }
 
 

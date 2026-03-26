@@ -159,7 +159,9 @@ def train_and_evaluate_logistic_regression():
     all_recall = []
     all_f1 = []
     all_auc = []
+    fold_details = []
     last_fpr, last_tpr = None, None
+    total_tn, total_fp, total_fn, total_tp = 0, 0, 0, 0
 
     for fold, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups), start=1):
         print(f"\n========== Fold {fold} ==========")
@@ -197,6 +199,9 @@ def train_and_evaluate_logistic_regression():
         all_f1.append(metrics["f1"])
         all_auc.append(metrics["roc_auc"])
         last_fpr, last_tpr = metrics["fpr"], metrics["tpr"]
+        tn, fp, fn, tp = metrics["confusion_matrix"].ravel()
+        total_tn += tn; total_fp += fp; total_fn += fn; total_tp += tp
+        fold_details.append({'model': 'Logistic Regression', 'fold': fold, 'accuracy': metrics['accuracy'], 'precision': metrics['precision'], 'recall': metrics['recall'], 'f1_score': metrics['f1'], 'roc_auc': metrics['roc_auc']})
 
     print("\n==============================")
     print("5-FOLD GROUPKFOLD CV RESULTS")
@@ -209,12 +214,11 @@ def train_and_evaluate_logistic_regression():
 
     return {
         "model_name": "Logistic Regression",
-        "accuracy":   float(np.mean(all_accuracy)),
-        "precision":  float(np.mean(all_precision)),
-        "recall":     float(np.mean(all_recall)),
-        "f1_score":   float(np.mean(all_f1)),
-        "fpr":        last_fpr.tolist(),
-        "tpr":        last_tpr.tolist(),
+        "accuracy": float(np.mean(all_accuracy)), "precision": float(np.mean(all_precision)),
+        "recall": float(np.mean(all_recall)), "f1_score": float(np.mean(all_f1)),
+        "tn": total_tn, "fp": total_fp, "fn": total_fn, "tp": total_tp,
+        "fpr": last_fpr.tolist(), "tpr": last_tpr.tolist(),
+        "fold_details": fold_details,
     }
 
 
