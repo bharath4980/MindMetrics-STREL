@@ -9,14 +9,14 @@ from sklearn.model_selection import GroupKFold
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score,
     f1_score, roc_auc_score, confusion_matrix,
-    classification_report, roc_curve
+    classification_report
 )
 
 import warnings
 warnings.filterwarnings("ignore")
 
 
-def train_and_evaluate_random_forest():
+def random_forest_groupkfold_cv():
     """
     Train and evaluate Random Forest using 5-fold GroupKFold
     based on Participant column.
@@ -29,7 +29,7 @@ def train_and_evaluate_random_forest():
     print("STEP 1: Loading Data")
     print("=" * 60)
 
-    df = pd.read_excel("../../data/processed/processed.xlsx")
+    df = pd.read_excel("/Users/lahariappireddy/Downloads/train.xlsx")
     print(f"Dataset shape: {df.shape}")
 
     # --------------------------------------------------
@@ -133,8 +133,6 @@ def train_and_evaluate_random_forest():
         except ValueError:
             auc = np.nan
 
-        fpr, tpr, _ = roc_curve(y_test, y_prob)
-
         print(f"Accuracy  : {acc:.4f}")
         print(f"Precision : {precision:.4f}")
         print(f"Recall    : {recall:.4f}")
@@ -147,9 +145,7 @@ def train_and_evaluate_random_forest():
             "precision": precision,
             "recall": recall,
             "f1_score": f1,
-            "roc_auc": auc,
-            "fpr": fpr,
-            "tpr": tpr,
+            "roc_auc": auc
         })
 
     # --------------------------------------------------
@@ -171,15 +167,15 @@ def train_and_evaluate_random_forest():
     print(f"ROC-AUC   : {results_df['roc_auc'].mean():.4f}")
 
     return {
-        "model_name": "Random Forest",
-        "accuracy":   results_df["accuracy"].mean(),
-        "precision":  results_df["precision"].mean(),
-        "recall":     results_df["recall"].mean(),
-        "f1_score":   results_df["f1_score"].mean(),
-        "fpr":        fold_results[-1]["fpr"].tolist(),
-        "tpr":        fold_results[-1]["tpr"].tolist(),
+        "model_name": "Random Forest with GroupKFold",
+        "fold_results": fold_results,
+        "average_accuracy": results_df["accuracy"].mean(),
+        "average_precision": results_df["precision"].mean(),
+        "average_recall": results_df["recall"].mean(),
+        "average_f1_score": results_df["f1_score"].mean(),
+        "average_roc_auc": results_df["roc_auc"].mean()
     }
 
 
 if __name__ == "__main__":
-    train_and_evaluate_random_forest()
+    results = random_forest_groupkfold_cv()

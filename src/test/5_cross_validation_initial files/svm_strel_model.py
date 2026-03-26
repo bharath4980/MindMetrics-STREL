@@ -3,18 +3,18 @@ import pandas as pd
 import warnings
 
 from sklearn.svm import SVC
-from sklearn.model_selection import GroupKFold, GridSearchCV
+from sklearn.model_selection import GroupKFold, GridSearchCV, cross_val_predict
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import (
     accuracy_score, confusion_matrix, classification_report,
-    precision_score, recall_score, f1_score, roc_auc_score, roc_curve
+    precision_score, recall_score, f1_score, roc_auc_score
 )
 
 warnings.filterwarnings("ignore")
 
-DATA_PATH = "../../data/processed/processed.xlsx"
+DATA_PATH = "data/processed/processed.xlsx"
 
 DROP_COLS = [
     "PA_Activity", "SNS_Stress",
@@ -61,7 +61,7 @@ def box(title):
     print(" " + "─" * BOX)
 
 
-def train_svm():
+def train_svm_groupkfold():
     print("\nLoading Data\n" + "=" * BOX)
     df = pd.read_excel(DATA_PATH)
     df = df.dropna(subset=[TARGET, GROUP_COL]).copy()
@@ -89,69 +89,86 @@ def train_svm():
 
     print("\nTraining with GroupKFold + GridSearch\n" + "=" * BOX)
 
-    # Step 1: Find best params via GridSearchCV on full data
-    grid = GridSearchCV(pipeline, param_grid, cv=gkf.split(X, y, groups=groups), scoring="f1", n_jobs=-1, verbose=1)
+    grid = GridSearchCV(
+        pipeline,
+        param_grid,
+        cv=gkf.split(X, y, groups=groups),
+        scoring="f1",
+        n_jobs=-1,
+        verbose=1
+    )
+
     grid.fit(X, y)
-    best_params = grid.best_params_
-    print(f"\nBest Parameters: {best_params}")
 
-    # Step 2: GroupKFold loop with best params, average metrics
-    fold_metrics = []
-    last_fpr, last_tpr = None, None
+    best_model = grid.best_estimator_
+    print(f"\nBest Parameters: {grid.best_params_}")
 
-    for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups=groups), 1):
-        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-        y_train, y_test = y[train_idx], y[test_idx]
+    y_pred = cross_val_predict(
+        best_model, X, y,
+        cv=gkf.split(X, y, groups=groups),
+        n_jobs=-1
+    )
 
-        # Build pipeline with best params
-        best_pipeline = Pipeline([
-            ("preprocessor", build_preprocessor(X_train)),
-            ("svm", SVC(probability=True, random_state=42, class_weight="balanced",
-                        kernel=best_params["svm__kernel"], C=best_params["svm__C"],
-                        **({} if best_params["svm__kernel"] == "linear" else {"gamma": best_params.get("svm__gamma", "scale")})))
-        ])
-        best_pipeline.fit(X_train, y_train)
+    y_prob = cross_val_predict(
+        best_model, X, y,
+        cv=gkf.split(X, y, groups=groups),
+        n_jobs=-1,
+        method="predict_proba"
+    )[:, 1]
 
-        y_pred = best_pipeline.predict(X_test)
-        y_prob = best_pipeline.predict_proba(X_test)[:, 1]
+    acc = accuracy_score(y, y_pred)
+    precision = precision_score(y, y_pred, zero_division=0)
+    recall = recall_score(y, y_pred, zero_division=0)
+    f1 = f1_score(y, y_pred, zero_division=0)
+    roc_auc = roc_auc_score(y, y_prob)
 
-        acc       = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred, zero_division=0)
-        recall    = recall_score(y_test, y_pred, zero_division=0)
-        f1        = f1_score(y_test, y_pred, zero_division=0)
-        roc_auc   = roc_auc_score(y_test, y_prob)
-        fpr, tpr, _ = roc_curve(y_test, y_prob)
+    tn, fp, fn, tp = confusion_matrix(y, y_pred).ravel()
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+    total = tn + fp + fn + tp
 
-        fold_metrics.append((acc, precision, recall, f1, roc_auc))
-        last_fpr, last_tpr = fpr, tpr
-
-        print(f"  Fold {fold} — Acc: {acc:.4f} | Prec: {precision:.4f} | Rec: {recall:.4f} | F1: {f1:.4f} | AUC: {roc_auc:.4f}")
-
-    accs, precs, recs, f1s, aucs = zip(*fold_metrics)
-    acc       = np.mean(accs)
-    precision = np.mean(precs)
-    recall    = np.mean(recs)
-    f1        = np.mean(f1s)
-    roc_auc   = np.mean(aucs)
-
-    box("MEAN METRICS ACROSS 5 FOLDS")
+    box("MODEL PERFORMANCE")
     print(f" │ {'Accuracy':<24} {acc:>10.4f} {'':<27}│")
     print(f" │ {'Precision':<24} {precision:>10.4f} {'':<27}│")
     print(f" │ {'Recall (Sensitivity)':<24} {recall:>10.4f} {'':<27}│")
+    print(f" │ {'Specificity':<24} {specificity:>10.4f} {'':<27}│")
     print(f" │ {'F1-Score':<24} {f1:>10.4f} {'':<27}│")
     print(f" │ {'ROC-AUC':<24} {roc_auc:>10.4f} {'':<27}│")
     print(" " + "─" * BOX)
 
-    return {
-        "model_name": "SVM",
-        "accuracy":   acc,
-        "precision":  precision,
-        "recall":     recall,
-        "f1_score":   f1,
-        "fpr":        last_fpr.tolist(),
-        "tpr":        last_tpr.tolist(),
-    }
+    box(f"CONFUSION MATRIX (n={total})")
+    print(f" │ {'':<20}│{'Pred: No Stress':^21}│{'Pred: Stress':^21}│")
+    print(" " + "─" * BOX)
+
+    ns_total = tn + fp
+    s_total = fn + tp
+
+    row1 = f"{tn:>5} ({(tn/ns_total*100 if ns_total else 0):5.1f}%)"
+    row2 = f"{fp:>5} ({(fp/ns_total*100 if ns_total else 0):5.1f}%)"
+    row3 = f"{fn:>5} ({(fn/s_total*100 if s_total else 0):5.1f}%)"
+    row4 = f"{tp:>5} ({(tp/s_total*100 if s_total else 0):5.1f}%)"
+
+    print(f" │ {'Actual: No Stress':<20}│{row1:^21}│{row2:^21}│")
+    print(f" │ {'Actual: Stress':<20}│{row3:^21}│{row4:^21}│")
+    print(" " + "─" * BOX)
+    print(f" │ {'Missed Stress:':<16} {fn:<6} {'False Alarms:':<16} {fp:<6} {'Correct:':<10} {tn+tp}/{total:<6}│")
+    print(" " + "─" * BOX)
+
+    box("CLASSIFICATION REPORT")
+    report = classification_report(
+        y, y_pred,
+        target_names=["No Stress", "Stress"],
+        zero_division=0
+    )
+
+    for line in report.split("\n"):
+        print(f" │ {line:<{BOX-4}}│")
+    print(" " + "─" * BOX)
+
+    print("\nTraining final model on full dataset...\n")
+    best_model.fit(X, y)
+
+    return best_model
 
 
 if __name__ == "__main__":
-    train_svm()
+    model = train_svm_groupkfold()
