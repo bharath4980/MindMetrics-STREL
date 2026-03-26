@@ -12,7 +12,7 @@ from sklearn.metrics import (
     accuracy_score, classification_report, confusion_matrix, 
     precision_score, recall_score, f1_score, roc_auc_score, roc_curve
 )
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, GroupKFold
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -27,22 +27,12 @@ DROP_COLS = [
 CAT_COLS = ["Day", "Period", "Profession", "Gender", "Activity4"]
 TARGET = "NHR_Stress"
 
-def preprocess(df, scaler=None, fit=True):
+def preprocess(df, scaler=None, train_cols=None, fit=True):
     """
     Preprocess data: drop columns, one-hot encode categoricals, scale features
-    
-    Args:
-        df: Input dataframe
-        scaler: StandardScaler for feature scaling
-        fit: Whether to fit scaler (True for train, False for test)
-    
-    Returns:
-        X: Processed features
-        y: Target labels (0=No Stress, 1=Stress)
-        scaler: Fitted scaler
     """
     df = df.copy()
-    df.drop(columns=DROP_COLS, inplace=True)
+    df.drop(columns=[c for c in DROP_COLS if c in df.columns], inplace=True)
 
     # Encode target
     y = (df[TARGET] == "S").astype(int).values
@@ -57,6 +47,11 @@ def preprocess(df, scaler=None, fit=True):
     # Impute missing values
     df = df.fillna(df.median(numeric_only=True))
 
+    if fit:
+        train_cols = df.columns.tolist()
+    else:
+        df = df.reindex(columns=train_cols, fill_value=0)
+
     X = df.values.astype(np.float32)
 
     # Scale features
@@ -66,15 +61,15 @@ def preprocess(df, scaler=None, fit=True):
     else:
         X = scaler.transform(X)
 
-    return X, y, scaler
+    return X, y, scaler, train_cols
 
 
 def train_and_evaluate_xgboost():
     """
-    Train XGBoost model with hyperparameter tuning and evaluate on test data
+    Train XGBoost model with 5-fold participant-based cross-validation.
     
     Returns:
-        dict: Model results including metrics and ROC curve data
+        dict: Averaged model results including metrics and ROC curve data
     """
 
     # ─────────────────────────────────────────────
@@ -84,31 +79,23 @@ def train_and_evaluate_xgboost():
     print("STEP 1: Loading Data")
     print("=" * 60)
 
-    train_df = pd.read_excel("../../data/processed/train.xlsx")
-    test_df = pd.read_excel("../../data/processed/test.xlsx")
-    print(f"Train shape: {train_df.shape}")
-    print(f"Test shape: {test_df.shape}")
+    df = pd.read_excel("../../data/processed/processed.xlsx")
+    print(f"Dataset shape: {df.shape}, Participants: {df['Participant'].nunique()}")
 
     # ─────────────────────────────────────────────
-    # 2. PREPROCESSING
+    # 2. 5-FOLD CROSS-VALIDATION
     # ─────────────────────────────────────────────
     print("\n" + "=" * 60)
-    print("STEP 2: Preprocessing")
+    print("STEP 2: 5-Fold Cross-Validation (GroupKFold by Participant)")
     print("=" * 60)
 
-    X_train, y_train, scaler = preprocess(train_df, fit=True)
-    X_test, y_test, _ = preprocess(test_df, scaler=scaler, fit=False)
+    gkf = GroupKFold(n_splits=5)
+    groups = df["Participant"].values
 
-    print(f"X_train: {X_train.shape}, y_train: {y_train.shape}")
-    print(f"X_test: {X_test.shape}, y_test: {y_test.shape}")
-    print(f"Train class balance — S: {y_train.sum()}, NS: {(y_train==0).sum()}")
-
-    # ─────────────────────────────────────────────
-    # 3. TRAINING
-    # ─────────────────────────────────────────────
-    print("\n" + "=" * 60)
-    print("STEP 3: Training XGBoost")
-    print("=" * 60)
+    fold_metrics = []
+    fold_details = []
+    last_fpr, last_tpr = None, None
+    total_tn, total_fp, total_fn, total_tp = 0, 0, 0, 0
 
     param_grid = {
         "n_estimators": [100, 200],
@@ -116,63 +103,74 @@ def train_and_evaluate_xgboost():
         "max_depth": [4, 6],
     }
 
-    xgb_base = xgb.XGBClassifier(
-        use_label_encoder=False,
-        eval_metric="logloss",
-        random_state=42
-    )
-
-    print("Running GridSearchCV (3-fold)...")
-    grid_search = GridSearchCV(xgb_base, param_grid, cv=3, scoring="roc_auc", n_jobs=-1, verbose=0)
-    grid_search.fit(X_train, y_train)
-
-    print(f"Best params: {grid_search.best_params_}")
-    print(f"Best CV ROC-AUC: {grid_search.best_score_:.4f}")
+    # ─────────────────────────────────────────────
+    # STEP 1: Find best params via GridSearchCV on full data
+    # ─────────────────────────────────────────────
+    print("Running GridSearchCV to find best params...")
+    X_all, y_all, _, _ = preprocess(df, fit=True)
+    xgb_base = xgb.XGBClassifier(use_label_encoder=False, eval_metric="logloss", random_state=42)
+    grid_search = GridSearchCV(xgb_base, param_grid, cv=gkf.split(df, groups=groups), scoring="roc_auc", n_jobs=-1, verbose=0)
+    grid_search.fit(X_all, y_all)
+    best_params = grid_search.best_params_
+    print(f"Best params: {best_params}")
 
     # ─────────────────────────────────────────────
-    # 4. EVALUATION
+    # STEP 2: GroupKFold evaluation with best params
     # ─────────────────────────────────────────────
+    for fold, (train_idx, test_idx) in enumerate(gkf.split(df, groups=groups), 1):
+        train_df = df.iloc[train_idx]
+        test_df  = df.iloc[test_idx]
+
+        X_train, y_train, scaler, train_cols = preprocess(train_df, fit=True)
+        X_test,  y_test,  _,      _          = preprocess(test_df, scaler=scaler, train_cols=train_cols, fit=False)
+
+        model = xgb.XGBClassifier(use_label_encoder=False, eval_metric="logloss", random_state=42, **best_params)
+        model.fit(X_train, y_train)
+
+        y_probs = model.predict_proba(X_test)[:, 1]
+        y_preds = (y_probs >= 0.5).astype(int)
+
+        acc       = accuracy_score(y_test, y_preds)
+        precision = precision_score(y_test, y_preds, zero_division=0)
+        recall    = recall_score(y_test, y_preds, zero_division=0)
+        f1        = f1_score(y_test, y_preds, zero_division=0)
+        auc       = roc_auc_score(y_test, y_probs)
+        fpr, tpr, _ = roc_curve(y_test, y_probs)
+
+        fold_metrics.append((acc, precision, recall, f1, auc))
+        last_fpr, last_tpr = fpr, tpr
+        tn, fp, fn, tp = confusion_matrix(y_test, y_preds).ravel()
+        total_tn += tn; total_fp += fp; total_fn += fn; total_tp += tp
+        fold_details.append({'model': 'XGBoost', 'fold': fold, 'accuracy': acc, 'precision': precision, 'recall': recall, 'f1_score': f1, 'roc_auc': auc})
+
+        print(f"Fold {fold} — Acc: {acc:.4f} | Prec: {precision:.4f} | Rec: {recall:.4f} | F1: {f1:.4f} | AUC: {auc:.4f}")
+
+    # ─────────────────────────────────────────────
+    # 3. AVERAGE METRICS
+    # ─────────────────────────────────────────────
+    accs, precs, recs, f1s, aucs = zip(*fold_metrics)
+    acc       = np.mean(accs)
+    precision = np.mean(precs)
+    recall    = np.mean(recs)
+    f1        = np.mean(f1s)
+    auc       = np.mean(aucs)
+
     print("\n" + "=" * 60)
-    print("STEP 4: Evaluation")
+    print("MEAN METRICS ACROSS 5 FOLDS")
     print("=" * 60)
-
-    model = grid_search.best_estimator_
-    y_probs = model.predict_proba(X_test)[:, 1]
-    y_preds = (y_probs >= 0.5).astype(int)
-
-    acc = accuracy_score(y_test, y_preds)
-    precision = precision_score(y_test, y_preds)
-    recall = recall_score(y_test, y_preds)
-    f1 = f1_score(y_test, y_preds)
-    auc = roc_auc_score(y_test, y_probs)
-
     print(f"Accuracy  : {acc:.4f}")
     print(f"Precision : {precision:.4f}")
     print(f"Recall    : {recall:.4f}")
     print(f"F1-Score  : {f1:.4f}")
     print(f"ROC-AUC   : {auc:.4f}")
 
-    label_names = ["NS (No Stress)", "S (Stress)"]
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_preds, target_names=label_names))
-    print("\nConfusion Matrix:")
-    print(pd.DataFrame(confusion_matrix(y_test, y_preds), index=label_names, columns=label_names))
-
-    # Calculate TPR and FPR for ROC curve
-    fpr, tpr, _ = roc_curve(y_test, y_probs)
-    
-    # Return results for comparison
-    results = {
+    return {
         'model_name': 'XGBoost',
-        'accuracy': acc,
-        'precision': precision,
-        'recall': recall,
-        'f1_score': f1,
-        'fpr': fpr.tolist(),
-        'tpr': tpr.tolist()
+        'accuracy': acc, 'precision': precision, 'recall': recall, 'f1_score': f1,
+        'tn': total_tn, 'fp': total_fp, 'fn': total_fn, 'tp': total_tp,
+        'fpr': last_fpr.tolist(), 'tpr': last_tpr.tolist(),
+        'fold_details': fold_details
     }
-    
-    return results
 
 
 if __name__ == "__main__":

@@ -17,29 +17,57 @@ class ModelEvaluator:
     def __init__(self):
         self.metrics = []
         self.roc_data = []
+        self.all_fold_details = []
     
-    def add_model(self, model_name, accuracy, precision, recall, f1_score, fpr=None, tpr=None):
-        """
-        Add a model's evaluation metrics
-        
-        Args:
-            model_name: Name of the model
-            accuracy: Accuracy score
-            precision: Precision score
-            recall: Recall score
-            f1_score: F1 score
-            fpr: False positive rates for ROC curve (optional)
-            tpr: True positive rates for ROC curve (optional)
-        """
+    def add_model(self, model_name, accuracy, precision, recall, f1_score, fpr=None, tpr=None, tn=None, fp=None, fn=None, tp=None):
         self.metrics.append({
             'Model': model_name, 
             'Accuracy': accuracy, 
             'Precision': precision,
             'Recall': recall,
-            'F1-Score': f1_score
+            'F1-Score': f1_score,
+            'TN': tn, 'FP': fp, 'FN': fn, 'TP': tp
         })
         if fpr is not None and tpr is not None:
             self.roc_data.append({'model': model_name, 'fpr': fpr, 'tpr': tpr})
+
+    def add_fold_details(self, fold_details):
+        """Collect per-fold metrics from a model"""
+        self.all_fold_details.extend(fold_details)
+
+    def save_fold_metrics(self, filepath):
+        """Save per-fold metrics to CSV"""
+        pd.DataFrame(self.all_fold_details).to_csv(filepath, index=False)
+        print(f"Fold metrics saved to: {filepath}")
+
+    def plot_fold_accuracy(self, save_path=None):
+        """Plot accuracy per fold for each model as a point-line chart"""
+        if not self.all_fold_details:
+            print("No fold details available")
+            return
+
+        df = pd.DataFrame(self.all_fold_details)
+        colors = ['steelblue', 'coral', 'green', 'purple']
+
+        plt.figure(figsize=(10, 6))
+        for i, model in enumerate(df['model'].unique()):
+            model_df = df[df['model'] == model].sort_values('fold')
+            plt.plot(model_df['fold'], model_df['accuracy'], marker='o', label=model,
+                     color=colors[i % len(colors)], linewidth=2, markersize=7)
+
+        plt.xlabel('Fold')
+        plt.ylabel('Accuracy')
+        plt.title('Accuracy per Fold - Model Comparison')
+        plt.xticks(range(1, 6))
+        plt.ylim([0, 1.05])
+        plt.legend()
+        plt.grid(alpha=0.3)
+        plt.tight_layout()
+
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Fold accuracy plot saved to: {save_path}")
+        plt.show()
     
     def print_summary(self):
         """Print summary table of all model metrics"""
@@ -47,8 +75,30 @@ class ModelEvaluator:
         print("\n" + "=" * 80)
         print("MODEL COMPARISON SUMMARY")
         print("=" * 80)
-        print(df.to_string(index=False))
+        print(df[['Model','Accuracy','Precision','Recall','F1-Score']].to_string(index=False))
         print("=" * 80)
+
+    def plot_confusion_matrices(self, save_path=None):
+        """Plot confusion matrices for all models as heatmaps"""
+        n = len(self.metrics)
+        fig, axes = plt.subplots(1, n, figsize=(5 * n, 4))
+        if n == 1:
+            axes = [axes]
+
+        for ax, m in zip(axes, self.metrics):
+            tn, fp, fn, tp = m.get('TN', 0), m.get('FP', 0), m.get('FN', 0), m.get('TP', 0)
+            cm = np.array([[tn, fp], [fn, tp]])
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+                        xticklabels=['Pred: No Stress', 'Pred: Stress'],
+                        yticklabels=['Actual: No Stress', 'Actual: Stress'])
+            ax.set_title(m['Model'], fontweight='bold')
+
+        plt.suptitle('Confusion Matrices (Summed across 5 folds)', fontweight='bold', y=1.02)
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Confusion matrices saved to: {save_path}")
+        plt.show()
     
     def plot_metrics(self, save_path=None):
         """
@@ -141,56 +191,39 @@ if __name__ == "__main__":
     # XGBoost
     from xg_boost_model import train_and_evaluate_xgboost
     result = train_and_evaluate_xgboost()
-    evaluator.add_model(
-        result['model_name'], 
-        result['accuracy'], 
-        result['precision'],
-        result['recall'],
-        result['f1_score'],
-        fpr=result['fpr'], 
-        tpr=result['tpr']
-    )
+    evaluator.add_model(result['model_name'], result['accuracy'], result['precision'],
+        result['recall'], result['f1_score'], fpr=result['fpr'], tpr=result['tpr'],
+        tn=result['tn'], fp=result['fp'], fn=result['fn'], tp=result['tp'])
+    evaluator.add_fold_details(result['fold_details'])
     
     # Random Forest
     from random_forest_model import train_and_evaluate_random_forest
     result = train_and_evaluate_random_forest()
-    evaluator.add_model(
-        result['model_name'], 
-        result['accuracy'], 
-        result['precision'],
-        result['recall'],
-        result['f1_score'],
-        fpr=result['fpr'], 
-        tpr=result['tpr']
-    )
+    evaluator.add_model(result['model_name'], result['accuracy'], result['precision'],
+        result['recall'], result['f1_score'], fpr=result['fpr'], tpr=result['tpr'],
+        tn=result['tn'], fp=result['fp'], fn=result['fn'], tp=result['tp'])
+    evaluator.add_fold_details(result['fold_details'])
     
     # SVM
     from svm_model import train_svm
     result = train_svm()
-    evaluator.add_model(
-        result['model_name'], 
-        result['accuracy'], 
-        result['precision'],
-        result['recall'],
-        result['f1_score'],
-        fpr=result['fpr'], 
-        tpr=result['tpr']
-    )
+    evaluator.add_model(result['model_name'], result['accuracy'], result['precision'],
+        result['recall'], result['f1_score'], fpr=result['fpr'], tpr=result['tpr'],
+        tn=result['tn'], fp=result['fp'], fn=result['fn'], tp=result['tp'])
+    evaluator.add_fold_details(result['fold_details'])
     
     # Logistic Regression (PyTorch)
     from logreg_model import train_and_evaluate_logistic_regression
     result = train_and_evaluate_logistic_regression()
-    evaluator.add_model(
-        result['model_name'], 
-        result['accuracy'], 
-        result['precision'],
-        result['recall'],
-        result['f1_score'],
-        fpr=result['fpr'], 
-        tpr=result['tpr']
-    )
+    evaluator.add_model(result['model_name'], result['accuracy'], result['precision'],
+        result['recall'], result['f1_score'], fpr=result['fpr'], tpr=result['tpr'],
+        tn=result['tn'], fp=result['fp'], fn=result['fn'], tp=result['tp'])
+    evaluator.add_fold_details(result['fold_details'])
     
     evaluator.print_summary()
+    evaluator.plot_confusion_matrices(save_path="../../results/metrics/confusion_matrices.png")
     evaluator.plot_metrics(save_path="../../results/metrics/model_comparison.png")
     evaluator.plot_roc_curves(save_path="../../results/metrics/roc_curves.png")
     evaluator.save_metrics("../../results/metrics/model_metrics.csv")
+    evaluator.save_fold_metrics("../../results/metrics/fold_metrics.csv")
+    evaluator.plot_fold_accuracy(save_path="../../results/metrics/fold_accuracy.png")

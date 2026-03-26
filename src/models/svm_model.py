@@ -1,161 +1,158 @@
-"""
-NHR_Stress Classification Pipeline
-Using Linear SVM (sklearn) for prediction
-Target: NHR_Stress (S = Stress, NS = No Stress)
-"""
-
 import numpy as np
 import pandas as pd
+import warnings
+
 from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GroupKFold, GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import (
     accuracy_score, confusion_matrix, classification_report,
     precision_score, recall_score, f1_score, roc_auc_score, roc_curve
 )
-import warnings
+
 warnings.filterwarnings("ignore")
 
-TRAIN_PATH = "../../data/processed/train.xlsx"
-TEST_PATH  = "../../data/processed/test.xlsx"
+DATA_PATH = "../../data/processed/processed.xlsx"
+
 DROP_COLS = [
-    "Participant", "PA_Activity", "SNS_Stress",  # ID and alternate labels
-    "NHR_S", "NHR_NS", "NHR_0_2SD",              # Derived from NHR_Stress (leakage)
-    "SNS_S", "SNS_NS", "SNSindexThreshold"       # Derived from SNS_Stress (leakage)
+    "PA_Activity", "SNS_Stress",
+    "NHR_S", "NHR_NS", "NHR_0_2SD",
+    "SNS_S", "SNS_NS", "SNSindexThreshold"
 ]
-CAT_COLS   = ["Day", "Period", "Profession", "Gender", "Activity4"]
-TARGET     = "NHR_Stress"
+
+CAT_COLS = ["Day", "Period", "Profession", "Gender", "Activity4"]
+TARGET = "NHR_Stress"
+GROUP_COL = "Participant"
+BOX = 70
 
 
 def encode_target(df):
-    """
-    Extract and encode the target column.
-    Returns binary array — 1 = Stress, 0 = No Stress
-    """
     return (df[TARGET].astype(str).str.strip().str.upper() == "S").astype(int).values
 
 
-def prepare_features(df, scaler=None, fit=True):
-    """
-    Build the feature matrix: drop columns, one-hot encode categoricals,
-    impute missing values with median, and normalize.
-
-    fit=True  — fits scaler on train data
-    fit=False — reuses fitted scaler on test data (prevents leakage)
-    """
+def prepare_dataframe(df):
     df = df.copy()
-    df.drop(columns=[c for c in DROP_COLS + [TARGET] if c in df.columns], inplace=True)
+    drop_cols = [TARGET, GROUP_COL] + [c for c in DROP_COLS if c in df.columns]
+    X = df.drop(columns=drop_cols, errors="ignore").copy()
 
     for col in CAT_COLS:
-        if col in df.columns:
-            df[col] = df[col].fillna("Unknown").astype(str)
-    df = pd.get_dummies(df, columns=[c for c in CAT_COLS if c in df.columns], drop_first=False)
+        if col in X.columns:
+            X[col] = X[col].fillna("Unknown").astype(str)
 
-    df = df.fillna(df.median(numeric_only=True))
+    return X
 
-    feat_names = df.columns.tolist()
-    X          = df.values.astype(np.float32)
 
-    if fit:
-        scaler = StandardScaler()
-        X      = scaler.fit_transform(X)
-    else:
-        X      = scaler.transform(X)
+def build_preprocessor(X):
+    categorical_cols = [c for c in CAT_COLS if c in X.columns]
+    numeric_cols = [c for c in X.columns if c not in categorical_cols]
 
-    return X, scaler, feat_names
+    return ColumnTransformer([
+        ("num", StandardScaler(), numeric_cols),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_cols)
+    ])
+
+
+def box(title):
+    print()
+    print(" " + "─" * BOX)
+    print(f" │{title:^{BOX-2}}│")
+    print(" " + "─" * BOX)
 
 
 def train_svm():
-    """
-    Train Linear SVM with preprocessing and evaluate on test data
-    
-    Returns:
-        dict: Model results including metrics and ROC curve data
-    """
+    print("\nLoading Data\n" + "=" * BOX)
+    df = pd.read_excel(DATA_PATH)
+    df = df.dropna(subset=[TARGET, GROUP_COL]).copy()
 
-    print("Loading Data")
-    print("=" * 55)
-    train_df = pd.read_excel(TRAIN_PATH)
-    test_df  = pd.read_excel(TEST_PATH)
-    print(f"  Train : {train_df.shape[0]} rows | {train_df.shape[1]} columns")
-    print(f"  Test  : {test_df.shape[0]} rows | {test_df.shape[1]} columns")
+    y = encode_target(df)
+    groups = df[GROUP_COL]
 
-    print("\nEncoding Labels")
-    print("=" * 55)
-    y_train = encode_target(train_df)
-    y_test  = encode_target(test_df)
-    print(f"  Train — Stress: {y_train.sum()} | No Stress: {(y_train == 0).sum()}")
-    print(f"  Test  — Stress: {y_test.sum()} | No Stress: {(y_test == 0).sum()}")
+    if groups.nunique() < 5:
+        raise ValueError("Need at least 5 participants for GroupKFold")
 
-    print("\nPreparing Features & Scaling")
-    print("=" * 55)
-    X_train, scaler, feat_names = prepare_features(train_df, fit=True)
-    X_test,  _,      _          = prepare_features(test_df, scaler=scaler, fit=False)
-    print(f"  Features after one-hot encoding : {X_train.shape[1]}")
-    print(f"  Train matrix : {X_train.shape}")
-    print(f"  Test matrix  : {X_test.shape}")
+    X = prepare_dataframe(df)
+    preprocessor = build_preprocessor(X)
 
-    print("\nTraining SVM")
-    print("=" * 55)
-    model = SVC(kernel="linear", C=1.0, probability=True, random_state=42)
-    model.fit(X_train, y_train)
-    print(f"  kernel=linear | C=1.0 | Training complete")
+    pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("svm", SVC(class_weight="balanced", probability=True, random_state=42))
+    ])
 
-    print("\nEvaluation")
-    print("=" * 55)
-    y_probs = model.predict_proba(X_test)[:, 1]
-    y_preds = (y_probs >= 0.5).astype(int)
+    param_grid = [
+        {"svm__kernel": ["linear"], "svm__C": [0.01, 0.1, 1, 10, 100]},
+        {"svm__kernel": ["rbf"], "svm__C": [0.1, 1, 10], "svm__gamma": ["scale", 0.1, 0.01]}
+    ]
 
-    acc         = accuracy_score(y_test, y_preds)
-    precision   = precision_score(y_test, y_preds)
-    recall      = recall_score(y_test, y_preds)
-    f1          = f1_score(y_test, y_preds)
-    roc_auc     = roc_auc_score(y_test, y_probs)
-    fpr, tpr, _ = roc_curve(y_test, y_probs)
-    cm          = confusion_matrix(y_test, y_preds)
-    tn, fp, fn, tp = cm.ravel()
-    specificity = tn / (tn + fp)
-    total       = tn + fp + fn + tp
+    gkf = GroupKFold(n_splits=5)
 
-    print()
-    print("  ┌─────────────────────────────────────────┐")
-    print("  │           MODEL PERFORMANCE              │")
-    print("  ├───────────────────────┬─────────────────┤")
-    print(f"  │  Accuracy             │     {acc:.4f}      │")
-    print(f"  │  Precision            │     {precision:.4f}      │")
-    print(f"  │  Recall (Sensitivity) │     {recall:.4f}      │")
-    print(f"  │  Specificity          │     {specificity:.4f}      │")
-    print(f"  │  F1-Score             │     {f1:.4f}      │")
-    print(f"  │  ROC-AUC              │     {roc_auc:.4f}      │")
-    print("  └───────────────────────┴─────────────────┘")
+    print("\nTraining with GroupKFold + GridSearch\n" + "=" * BOX)
 
-    print()
-    print(f"  ┌─────────────────────────────────────────────────────┐")
-    print(f"  │             CONFUSION MATRIX  (n={total})              │")
-    print(f"  ├──────────────────────┬──────────────┬───────────────┤")
-    print(f"  │                      │  Pred: No S  │  Pred: Stress │")
-    print(f"  ├──────────────────────┼──────────────┼───────────────┤")
-    print(f"  │  Actual: No Stress   │  {tn:>4} ({tn/(tn+fp)*100:4.1f}%) │  {fp:>4} ({fp/(tn+fp)*100:4.1f}%)  │")
-    print(f"  │  Actual: Stress      │  {fn:>4} ({fn/(fn+tp)*100:4.1f}%) │  {tp:>4} ({tp/(fn+tp)*100:4.1f}%)  │")
-    print(f"  └──────────────────────┴──────────────┴───────────────┘")
-    print(f"  ✗ Missed Stress : {fn:<5} ✗ False Alarms : {fp:<5} ✓ Correct : {tn+tp}/{total}")
+    # Step 1: Find best params via GridSearchCV on full data
+    grid = GridSearchCV(pipeline, param_grid, cv=gkf.split(X, y, groups=groups), scoring="f1", n_jobs=-1, verbose=1)
+    grid.fit(X, y)
+    best_params = grid.best_params_
+    print(f"\nBest Parameters: {best_params}")
 
-    print()
-    print("  ┌─────────────────────────────────────────┐")
-    print("  │          CLASSIFICATION REPORT           │")
-    print("  └─────────────────────────────────────────┘")
-    label_names = ["NS (No Stress)", "S (Stress)"]
-    print(classification_report(y_test, y_preds, target_names=label_names))
+    # Step 2: GroupKFold loop with best params, average metrics
+    fold_metrics = []
+    fold_details = []
+    last_fpr, last_tpr = None, None
+    total_tn, total_fp, total_fn, total_tp = 0, 0, 0, 0
+
+    for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups=groups), 1):
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        # Build pipeline with best params
+        best_pipeline = Pipeline([
+            ("preprocessor", build_preprocessor(X_train)),
+            ("svm", SVC(probability=True, random_state=42, class_weight="balanced",
+                        kernel=best_params["svm__kernel"], C=best_params["svm__C"],
+                        **({} if best_params["svm__kernel"] == "linear" else {"gamma": best_params.get("svm__gamma", "scale")})))
+        ])
+        best_pipeline.fit(X_train, y_train)
+
+        y_pred = best_pipeline.predict(X_test)
+        y_prob = best_pipeline.predict_proba(X_test)[:, 1]
+
+        acc       = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, zero_division=0)
+        recall    = recall_score(y_test, y_pred, zero_division=0)
+        f1        = f1_score(y_test, y_pred, zero_division=0)
+        roc_auc   = roc_auc_score(y_test, y_prob)
+        fpr, tpr, _ = roc_curve(y_test, y_prob)
+
+        fold_metrics.append((acc, precision, recall, f1, roc_auc))
+        last_fpr, last_tpr = fpr, tpr
+        tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+        total_tn += tn; total_fp += fp; total_fn += fn; total_tp += tp
+        fold_details.append({'model': 'SVM', 'fold': fold, 'accuracy': acc, 'precision': precision, 'recall': recall, 'f1_score': f1, 'roc_auc': roc_auc})
+
+        print(f"  Fold {fold} — Acc: {acc:.4f} | Prec: {precision:.4f} | Rec: {recall:.4f} | F1: {f1:.4f} | AUC: {roc_auc:.4f}")
+
+    accs, precs, recs, f1s, aucs = zip(*fold_metrics)
+    acc       = np.mean(accs)
+    precision = np.mean(precs)
+    recall    = np.mean(recs)
+    f1        = np.mean(f1s)
+    roc_auc   = np.mean(aucs)
+
+    box("MEAN METRICS ACROSS 5 FOLDS")
+    print(f" │ {'Accuracy':<24} {acc:>10.4f} {'':<27}│")
+    print(f" │ {'Precision':<24} {precision:>10.4f} {'':<27}│")
+    print(f" │ {'Recall (Sensitivity)':<24} {recall:>10.4f} {'':<27}│")
+    print(f" │ {'F1-Score':<24} {f1:>10.4f} {'':<27}│")
+    print(f" │ {'ROC-AUC':<24} {roc_auc:>10.4f} {'':<27}│")
+    print(" " + "─" * BOX)
 
     return {
-        "model_name" : "SVM",
-        "accuracy"   : acc,
-        "precision"  : precision,
-        "recall"     : recall,
-        "f1_score"   : f1,
-        "specificity": specificity,
-        "roc_auc"    : roc_auc,
-        "fpr"        : fpr.tolist(),
-        "tpr"        : tpr.tolist(),
+        "model_name": "SVM",
+        "accuracy": acc, "precision": precision, "recall": recall, "f1_score": f1,
+        "tn": total_tn, "fp": total_fp, "fn": total_fn, "tp": total_tp,
+        "fpr": last_fpr.tolist(), "tpr": last_tpr.tolist(),
+        "fold_details": fold_details,
     }
 
 
