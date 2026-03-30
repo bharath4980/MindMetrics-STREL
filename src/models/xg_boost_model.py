@@ -95,6 +95,7 @@ def train_and_evaluate_xgboost():
     fold_metrics = []
     fold_details = []
     last_fpr, last_tpr = None, None
+    fold_importances = []
     total_tn, total_fp, total_fn, total_tp = 0, 0, 0, 0
 
     param_grid = {
@@ -126,6 +127,7 @@ def train_and_evaluate_xgboost():
 
         model = xgb.XGBClassifier(use_label_encoder=False, eval_metric="logloss", random_state=42, **best_params)
         model.fit(X_train, y_train)
+        fold_importances.append(pd.Series(model.feature_importances_, index=train_cols))
 
         y_probs = model.predict_proba(X_test)[:, 1]
         y_preds = (y_probs >= 0.5).astype(int)
@@ -169,7 +171,8 @@ def train_and_evaluate_xgboost():
         'accuracy': acc, 'precision': precision, 'recall': recall, 'f1_score': f1,
         'tn': total_tn, 'fp': total_fp, 'fn': total_fn, 'tp': total_tp,
         'fpr': last_fpr.tolist(), 'tpr': last_tpr.tolist(),
-        'fold_details': fold_details
+        'fold_details': fold_details,
+        'avg_feature_importances': pd.concat(fold_importances, axis=1).mean(axis=1).sort_values(ascending=False),
     }
 
 
