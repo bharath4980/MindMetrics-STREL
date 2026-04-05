@@ -30,7 +30,8 @@ GROUP_COL = "Participant"
 DROP_COLS = [
     "Participant", "PA_Activity", "SNS_Stress",  # ID and alternate labels
     "NHR_S", "NHR_NS", "NHR_0_2SD",              # Derived from NHR_Stress (leakage)
-    "SNS_S", "SNS_NS", "SNSindexThreshold"       # Derived from SNS_Stress (leakage)
+    "SNS_S", "SNS_NS", "SNSindexThreshold",      # Derived from SNS_Stress (leakage)
+    "HR", "HR_Baseline", "HR_Normalized"         # Correlated to NHR_Stress
 ]
 
 N_SPLITS = 5
