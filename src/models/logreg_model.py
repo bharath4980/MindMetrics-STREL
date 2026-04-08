@@ -146,8 +146,12 @@ def evaluate_model(model, X_val, y_val):
     return metrics
 
 
-def train_and_evaluate_logistic_regression():
+def train_and_evaluate_logistic_regression(selected_features: list = None):
     X, y, groups = load_data(DATA_PATH)
+
+    # Apply selected_features filter if provided (after DROP_COLS)
+    if selected_features:
+        X = X[[c for c in selected_features if c in X.columns]]
 
     print("Raw shape:", X.shape)
     print("Target counts:", y.value_counts().to_dict())
