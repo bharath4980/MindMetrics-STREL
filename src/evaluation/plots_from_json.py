@@ -69,9 +69,41 @@ def plot_model_comparison(model_metrics: list, save_path: str):
     print(f"Saved: {save_path}")
 
 
-def plot_roc_curves(model_metrics: list, save_path: str):
-    # ROC data isn't in the JSON — skip gracefully
-    print(f"Skipped: ROC curves (fpr/tpr not stored in run JSON)")
+def plot_roc_curves(roc_data: list, save_path: str):
+    """
+    Plot ROC curves from saved FPR/TPR data
+    
+    Args:
+        roc_data: List of dicts with 'model', 'fpr', 'tpr' keys
+        save_path: Path to save the plot
+    """
+    if not roc_data:
+        print(f"Skipped: ROC curves (no roc_data in JSON)")
+        return
+    
+    plt.figure(figsize=(10, 8))
+    colors = ["steelblue", "coral", "green", "purple", "orange"]
+    
+    for i, data in enumerate(roc_data):
+        fpr = data.get('fpr', [])
+        tpr = data.get('tpr', [])
+        model = data.get('model', f'Model {i+1}')
+        
+        if fpr and tpr:
+            plt.plot(fpr, tpr, color=colors[i % len(colors)], lw=2, label=model)
+    
+    plt.plot([0, 1], [0, 1], 'k--', lw=2, label='Random')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curves - Model Comparison', fontweight='bold')
+    plt.legend(loc="lower right")
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Saved: {save_path}")
 
 
 def plot_fold_accuracy(fold_metrics: list, save_path: str):
@@ -120,11 +152,12 @@ if __name__ == "__main__":
             out_dir.mkdir(exist_ok=True)
             model_metrics = run["output"]["model_metrics"]
             fold_metrics  = run["output"]["fold_metrics"]
+            roc_data      = run["output"].get("roc_data", [])
             print(f"--- {stem} ---")
             plot_confusion_matrices(model_metrics, str(out_dir / "confusion_matrices.png"))
             plot_model_comparison(model_metrics,   str(out_dir / "model_comparison.png"))
             plot_fold_accuracy(fold_metrics,       str(out_dir / "fold_accuracy.png"))
-            plot_roc_curves(model_metrics,         str(out_dir / "roc_curves.png"))
+            plot_roc_curves(roc_data,              str(out_dir / "roc_curves.png"))
         print("\nAll done.")
     else:
         json_path = sys.argv[1]
@@ -136,6 +169,7 @@ if __name__ == "__main__":
 
         model_metrics = run["output"]["model_metrics"]
         fold_metrics  = run["output"]["fold_metrics"]
+        roc_data      = run["output"].get("roc_data", [])
 
         print(f"\nRegenerating plots for: {stem}")
         print(f"User: {run.get('user', '?')} | Features: {len(run.get('features_used', []))}")
@@ -144,6 +178,6 @@ if __name__ == "__main__":
         plot_confusion_matrices(model_metrics, str(out_dir / "confusion_matrices.png"))
         plot_model_comparison(model_metrics,   str(out_dir / "model_comparison.png"))
         plot_fold_accuracy(fold_metrics,       str(out_dir / "fold_accuracy.png"))
-        plot_roc_curves(model_metrics,         str(out_dir / "roc_curves.png"))
+        plot_roc_curves(roc_data,              str(out_dir / "roc_curves.png"))
 
         print("\nDone.")

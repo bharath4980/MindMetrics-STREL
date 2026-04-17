@@ -226,6 +226,9 @@ def run_all(selected_features: list = None):
     evaluator.plot_fold_accuracy(save_path=f"{METRICS_DIR}/fold_accuracy.png", show=show)
     evaluator.save_metrics(f"{METRICS_DIR}/model_metrics.csv")
     evaluator.save_fold_metrics(f"{METRICS_DIR}/fold_metrics.csv")
+    
+    # Return ROC data for JSON storage
+    return evaluator.roc_data
 
 
 if __name__ == "__main__":
