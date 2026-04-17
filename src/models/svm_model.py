@@ -20,8 +20,8 @@ DATA_PATH = Path(__file__).resolve().parent / "../../data/processed/processed.xl
 DROP_COLS = [
     "PA_Activity", "SNS_Stress",
     "NHR_S", "NHR_NS", "NHR_0_2SD",
-    "SNS_S", "SNS_NS", "SNSindexThreshold",
-    "HR", "HR_Baseline", "HR_Normalized"   # Correlated to NHR_Stress
+    "SNS_S", "SNS_NS", "SNSindexThreshold"
+    # "HR", "HR_Baseline", "HR_Normalized"   # Correlated to NHR_Stress
 ]
 
 CAT_COLS = ["Day", "Period", "Profession", "Gender", "Activity4"]

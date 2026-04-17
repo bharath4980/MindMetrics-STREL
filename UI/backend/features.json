@@ -27,6 +27,15 @@
       ]
     },
     {
+      "label": "Heart Rate",
+      "features": ["HR", "HR_Baseline", "HR_Normalized"],
+      "tooltips": [
+        "Heart rate in beats per minute (BPM)",
+        "Baseline heart rate measured at rest",
+        "Normalized heart rate relative to baseline"
+      ]
+    },
+    {
       "label": "Physiological",
       "features": ["RR", "Cadence", "Speed", "PNSindex", "SNSindex", "Stressindex"],
       "tooltips": [
