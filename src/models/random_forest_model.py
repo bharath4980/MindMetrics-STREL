@@ -52,8 +52,8 @@ def train_and_evaluate_random_forest(selected_features: list = None):
     COLUMNS_TO_DROP = [
         "PA_Activity", "SNS_Stress",   # alternate labels
         "NHR_S", "NHR_NS", "NHR_0_2SD",
-        "SNS_S", "SNS_NS", "SNSindexThreshold",
-        "HR", "HR_Baseline", "HR_Normalized"   # Correlated to NHR_Stress
+        "SNS_S", "SNS_NS", "SNSindexThreshold"
+        # "HR", "HR_Baseline", "HR_Normalized"   # Correlated to NHR_Stress
     ]
 
     # Save Participant separately for grouping
