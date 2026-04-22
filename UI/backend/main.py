@@ -33,6 +33,7 @@ app.mount("/results", StaticFiles(directory=METRICS_DIR), name="results")
 
 class RunRequest(BaseModel):
     selected_features: list[str]
+    selected_models: list[str] = None
     user: str
     notes: str
 
@@ -53,7 +54,7 @@ def features() -> dict:
 
 @app.post("/run")
 def run(request: RunRequest):
-    return run_model(request.selected_features)
+    return run_model(request.selected_features, request.selected_models)
 
 
 @app.post("/save")

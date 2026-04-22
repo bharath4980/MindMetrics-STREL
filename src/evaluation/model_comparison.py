@@ -196,7 +196,7 @@ class ModelEvaluator:
 # ─────────────────────────────────────────────
 # COMPARE MODELS
 # ─────────────────────────────────────────────
-def run_all(selected_features: list = None):
+def run_all(selected_features: list = None, selected_models: list = None):
     import sys
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'models'))
@@ -209,15 +209,29 @@ def run_all(selected_features: list = None):
     METRICS_DIR = os.path.join(os.path.dirname(__file__), '../../results/metrics')
     show = selected_features is None  # show plots only when running standalone
 
+    # Map model names to functions
+    all_models = {
+        "XGBoost": train_and_evaluate_xgboost,
+        "Random Forest": train_and_evaluate_random_forest,
+        "SVM": train_svm,
+        "Logistic Regression": train_and_evaluate_logistic_regression
+    }
+    
+    # If no models specified, run all
+    if not selected_models:
+        selected_models = list(all_models.keys())
+    
     evaluator = ModelEvaluator()
 
-    for fn in [train_and_evaluate_xgboost, train_and_evaluate_random_forest,
-               train_svm, train_and_evaluate_logistic_regression]:
-        result = fn(selected_features=selected_features)
-        evaluator.add_model(result['model_name'], result['accuracy'], result['precision'],
-            result['recall'], result['f1_score'], fpr=result['fpr'], tpr=result['tpr'],
-            tn=result['tn'], fp=result['fp'], fn=result['fn'], tp=result['tp'])
-        evaluator.add_fold_details(result['fold_details'])
+    # Only run selected models
+    for model_name in selected_models:
+        if model_name in all_models:
+            fn = all_models[model_name]
+            result = fn(selected_features=selected_features)
+            evaluator.add_model(result['model_name'], result['accuracy'], result['precision'],
+                result['recall'], result['f1_score'], fpr=result['fpr'], tpr=result['tpr'],
+                tn=result['tn'], fp=result['fp'], fn=result['fn'], tp=result['tp'])
+            evaluator.add_fold_details(result['fold_details'])
 
     evaluator.print_summary()
     evaluator.plot_confusion_matrices(save_path=f"{METRICS_DIR}/confusion_matrices.png", show=show)
