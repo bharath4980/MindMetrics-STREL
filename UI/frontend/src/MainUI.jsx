@@ -8,11 +8,19 @@ const PLOTS = [
   { key: "fold_accuracy.png",      label: "Fold Accuracy" },
 ];
 
+const AVAILABLE_MODELS = [
+  { name: "XGBoost", description: "Gradient boosting with decision trees" },
+  { name: "Random Forest", description: "Ensemble of decision trees" },
+  { name: "SVM", description: "Support Vector Machine classifier" },
+  { name: "Logistic Regression", description: "Linear classification model" },
+];
+
 export default function MainUI({ initialPresignedUrl = "", onBack }) {
   const [user, setUser] = useState("");
   const [notes, setNotes] = useState("");
   const [features, setFeatures] = useState([]);
   const [selectedFeatures, setSelectedFeatures] = useState([]);
+  const [selectedModels, setSelectedModels] = useState(AVAILABLE_MODELS.map(m => m.name));
   const [output, setOutput] = useState(null);
   const [loadingFeatures, setLoadingFeatures] = useState(true);
   const [runState, setRunState] = useState({ loading: false, error: "" });
@@ -43,6 +51,12 @@ export default function MainUI({ initialPresignedUrl = "", onBack }) {
   function toggleFeature(feature) {
     setSelectedFeatures((cur) =>
       cur.includes(feature) ? cur.filter((f) => f !== feature) : [...cur, feature]
+    );
+  }
+
+  function toggleModel(modelName) {
+    setSelectedModels((cur) =>
+      cur.includes(modelName) ? cur.filter((m) => m !== modelName) : [...cur, modelName]
     );
   }
 
@@ -98,7 +112,39 @@ export default function MainUI({ initialPresignedUrl = "", onBack }) {
     await attemptS3Save(payload);
   }
 
+  function downloadJSON() {
+    if (!output) return;
+    
+    const timestamp = new Date().toISOString();
+    const allFeatures = features.flatMap((c) => c.features);
+    const excludedFeatures = allFeatures.filter((f) => !selectedFeatures.includes(f));
+    const payload = { 
+      user, 
+      timestamp, 
+      notes, 
+      features_used: selectedFeatures, 
+      features_excluded: excludedFeatures, 
+      output 
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${user.trim().replace(/\s+/g, "_") || "user"}_${timestamp.replace(/:/g, "-").replace(/\./g, "-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   async function handleRun() {
+    // Validate at least one model is selected
+    if (selectedModels.length === 0) {
+      setRunState({ loading: false, error: "Please select at least one model to run." });
+      return;
+    }
+
     setRunState({ loading: true, error: "" });
     setSaveState({ local: "", s3: "", s3Failed: false });
     setOutput(null);
@@ -110,7 +156,12 @@ export default function MainUI({ initialPresignedUrl = "", onBack }) {
       const response = await fetch(`${API_BASE_URL}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selected_features: selectedFeatures, user, notes }),
+        body: JSON.stringify({ 
+          selected_features: selectedFeatures, 
+          selected_models: selectedModels,
+          user, 
+          notes 
+        }),
       });
       if (!response.ok) throw new Error();
       result = await response.json();
@@ -143,6 +194,9 @@ export default function MainUI({ initialPresignedUrl = "", onBack }) {
             <div className="flex flex-col gap-3 md:items-end">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                 {selectedFeatures.length} of {features.flatMap((c) => c.features).length} features selected
+              </div>
+              <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-700">
+                {selectedModels.length} of {AVAILABLE_MODELS.length} models selected
               </div>
               <button type="button" onClick={onBack}
                 className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
@@ -194,6 +248,28 @@ export default function MainUI({ initialPresignedUrl = "", onBack }) {
               )}
             </section>
 
+            {/* Section 2.5 - Model Selection */}
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <h2 className="text-lg font-semibold text-slate-800">Section 2.5 - Model Selection</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {AVAILABLE_MODELS.map((model) => {
+                  const isSelected = selectedModels.includes(model.name);
+                  return (
+                    <button key={model.name} type="button"
+                      title={model.description}
+                      onClick={() => toggleModel(model.name)}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                        isSelected
+                          ? "border-cyan-500 bg-cyan-500 text-white"
+                          : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+                      }`}>
+                      {model.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
             {/* Section 3 - Notes */}
             <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <h2 className="text-lg font-semibold text-slate-800">Section 3 - Notes</h2>
@@ -239,6 +315,15 @@ export default function MainUI({ initialPresignedUrl = "", onBack }) {
                         </button>
                       )}
                     </div>
+                  )}
+                  {output && (
+                    <button type="button" onClick={downloadJSON}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download JSON
+                    </button>
                   )}
                 </div>
               )}
@@ -311,12 +396,14 @@ export default function MainUI({ initialPresignedUrl = "", onBack }) {
 
                   {/* Plots */}
                   <div>
-                    <p className="mb-3 text-sm font-semibold text-slate-700">Result Plots</p>
+                    <p className="mb-3 text-sm font-semibold text-slate-700">Result Plots (click to open full size)</p>
                     <div className="grid gap-6 sm:grid-cols-2">
                       {PLOTS.map(({ key, label }) => (
                         <div key={key} className="rounded-2xl border border-slate-200 bg-white p-3">
                           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</p>
-                          <img src={`${API_BASE_URL}/results/${key}?t=${Date.now()}`} alt={label} className="w-full rounded-xl" />
+                          <a href={`${API_BASE_URL}/results/${key}?t=${Date.now()}`} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
+                            <img src={`${API_BASE_URL}/results/${key}?t=${Date.now()}`} alt={label} className="w-full rounded-xl transition hover:opacity-80" />
+                          </a>
                         </div>
                       ))}
                     </div>

@@ -9,14 +9,15 @@ from model_comparison import run_all
 METRICS_DIR = os.path.join(os.path.dirname(__file__), '../../results/metrics')
 
 
-def run_model(selected_features: list[str]) -> dict:
-    roc_data = run_all(selected_features=selected_features)
+def run_model(selected_features: list[str], selected_models: list[str] = None) -> dict:
+    roc_data = run_all(selected_features=selected_features, selected_models=selected_models)
 
     model_metrics = pd.read_csv(f"{METRICS_DIR}/model_metrics.csv").to_dict(orient='records')
     fold_metrics  = pd.read_csv(f"{METRICS_DIR}/fold_metrics.csv").to_dict(orient='records')
 
     return {
         "selected_features": selected_features,
+        "selected_models": selected_models,
         "model_metrics": model_metrics,
         "fold_metrics": fold_metrics,
         "roc_data": roc_data,
