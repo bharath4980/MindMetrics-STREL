@@ -30,33 +30,36 @@ MindMetrics-STREL/
 │   ├── eda/                 # Feature analysis outputs
 │   ├── models/              # Saved trained models
 │   ├── plots/               # Visualizations
-│   └── metrics/             # Performance tables
+│   ├── metrics/             # Performance tables
+│   └── runs/                # Saved run history (JSON + plots)
+├── UI/
+│   ├── backend/             # FastAPI server
+│   └── frontend/            # React + Vite interface
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
+## 📋 Prerequisites
+
+- **Python 3.8+** - For backend and ML models
+- **Node.js 16+** - For frontend development
+- **Git** - For cloning the repository
+- **pip** - Python package manager
+- **npm** - Node package manager
+
+---
+
 ## ⚙️ Setup
 
 ```bash
-# 1. Clone
-git clone <repo-url>
+# Clone the repository
+git clone https://github.com/harishcmuthyala/MindMetrics-STREL.git
 cd MindMetrics-STREL
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Download the dataset
-#    Direct link: https://github.com/UH-ACDC/STREL/raw/main/data/Activity_Stress_data_N24.csv
-#    Save it as: data/raw/STREL_raw.csv
 ```
 
-> **PyTorch install note:** `requirements.txt` installs the CPU build by
-> default. If you have a GPU, install PyTorch manually first:
-> ```bash
-> pip install torch --index-url https://download.pytorch.org/whl/cu121
-> ```
+> **Note:** The dataset is already included in `data/raw/STREL_raw.csv`
 
 ---
 
@@ -74,7 +77,7 @@ pip install -r requirements.txt
 
 ## 📊 Evaluation
 
-**Metrics:** Accuracy · Precision · Recall · F1-Score · ROC-AUC · Specificity
+**Metrics:** Accuracy · Precision · Recall · F1-Score · ROC-AUC
 
 **Validation:** Person-based 3-fold CV using GroupKFold on Participant column
 (ensures no participant appears in both train and test sets).
@@ -84,6 +87,37 @@ personality, 3 demographic, 3 daily patterns, 4 categorical (encoded), 2
 temporal (Hour, Minute).
 
 **Target:** NHR_Stress (binary: S=1, NS=0)
+
+---
+
+## 🖥️ UI Setup
+
+### Backend
+
+```bash
+cd UI/backend
+pip install -r requirements.txt
+python -m uvicorn main:app --reload
+```
+
+Backend runs at: **http://127.0.0.1:8000**
+
+### Frontend (Open NEW terminal)
+
+```bash
+cd UI/frontend
+npm install
+npm run dev
+```
+
+Frontend runs at: **http://127.0.0.1:5173**
+
+### Using the UI
+
+- Select from 32 features across 9 categories
+- Choose models: XGBoost, Random Forest, SVM, Logistic Regression
+- View metrics, confusion matrices, ROC curves, feature importance
+- Results auto-save to `results/runs/`
 
 ---
 
