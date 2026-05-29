@@ -44,6 +44,7 @@ Traditional stress assessment relies on subjective surveys. MindMetrics replaces
 
 ## 📁 Project Structure
 
+```
 MindMetrics-STREL/
 ├── data/
 │   ├── raw/                 # Original CSV (STREL_raw.csv)
@@ -68,6 +69,7 @@ MindMetrics-STREL/
 │   └── frontend/            # React + Vite interface
 ├── requirements.txt
 └── README.md
+```
 
 ---
 
@@ -77,26 +79,32 @@ MindMetrics-STREL/
 - Python 3.8+ · Node.js 16+ · Git · pip · npm
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/bharath4980/MindMetrics-STREL.git
 cd MindMetrics-STREL
 ```
+
 > Dataset is already included at `data/raw/STREL_raw.csv`
 
 ### 2. Start the backend
+
 ```bash
 cd UI/backend
 pip install -r requirements.txt
 python -m uvicorn main:app --reload
 ```
+
 Backend runs at: **http://127.0.0.1:8000**
 
 ### 3. Start the frontend (open a new terminal)
+
 ```bash
 cd UI/frontend
 npm install
 npm run dev
 ```
+
 Frontend runs at: **http://127.0.0.1:5173**
 
 ---
