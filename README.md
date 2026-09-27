@@ -1,7 +1,7 @@
 # MindMetrics — Stress Prediction System 🧠
 
-> Automated stress detection from physiological signals using machine learning  
-> Full-stack system: FastAPI backend + React frontend
+> A capstone application for comparing stress-classification models on the STREL dataset  
+> React experiment dashboard + FastAPI backend
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?style=flat&logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-backend-green?style=flat&logo=fastapi)
@@ -11,32 +11,42 @@
 **Course:** CSCI 6838 – Spring 2026 Capstone &nbsp;|&nbsp; **Team:** Mind Metrics  
 **University:** University of Houston – Clear Lake
 
-Traditional stress assessment relies on subjective surveys. MindMetrics replaces that with an objective, automated system — taking physiological and activity-based data as input and predicting whether a person is stressed or not in real time, using the [STREL](https://osf.io/qshv7/) dataset of crisis leaders in naturalistic settings.
+MindMetrics explores stress classification using physiological and activity-based data from the [STREL](https://osf.io/qshv7/) dataset of crisis leaders in naturalistic settings. Users select features and models, run training and evaluation, and compare metrics and visualizations through a React interface backed by FastAPI.
+
+## My Contribution
+
+This is my fork of our UHCL team capstone. My primary contribution was the **Logistic Regression workflow**, including preprocessing and model evaluation.
+
+- Developed a Logistic Regression model in PyTorch using a linear layer, binary cross-entropy loss, and the Adam optimizer.
+- Worked on numeric scaling and categorical encoding for the model inputs.
+- Evaluated the model with five-fold GroupKFold, grouping records by participant.
+- Reviewed accuracy, precision, recall, F1, ROC-AUC, and confusion matrices across folds.
+
+See the [Logistic Regression implementation](src/models/logreg_model.py) and [earlier experiments](src/test/). The full application and four-model comparison are shared team work; the [upstream repository](https://github.com/harishcmuthyala/MindMetrics-STREL) retains the project history.
 
 ---
 
-## 📊 Results
+## 📊 Evaluation and Saved Results
 
-| Model               | Accuracy | ROC-AUC |
-|---------------------|----------|---------|
-| XGBoost             | ~70%     | 0.75    |
-| Random Forest       | ~70%     | 0.75    |
-| SVM                 | ~69%     | ~0.73   |
-| Logistic Regression | ~68%     | ~0.72   |
+The model implementations use **five-fold GroupKFold by participant**. Records from a participant stay within one fold, avoiding participant overlap between training and validation sets. The Logistic Regression preprocessing pipeline is fitted on each training fold before transforming its validation fold.
 
-**Validation:** Person-based 3-fold GroupKFold CV — no participant appears in both train and test sets, preventing data leakage across individuals
+The committed [model metrics](results/metrics/model_metrics.csv) and [fold metrics](results/metrics/fold_metrics.csv) contain this saved experiment snapshot:
 
-**Features:** 26 total — 5 physiological, 2 motion, 3 NASA-TLX, 4 Big Five personality, 3 demographic, 3 daily patterns, 4 categorical (encoded), 2 temporal (Hour, Minute)
+| Model | Mean fold accuracy | Mean fold F1 |
+|---|---:|---:|
+| Logistic Regression | 71.13% | 0.606 |
+| Random Forest | 67.18% | 0.610 |
 
-**Top predictor:** Heart rate-related features had the highest importance score  
-**Target:** NHR_Stress (binary: Stressed = 1, Not-Stressed = 0)
+These values describe the stored run, not a fixed score for every feature selection. The current CSV snapshot contains these two models; the application also supports SVM and XGBoost. New runs regenerate the metrics files.
+
+**Target:** `NHR_Stress` (binary: Stressed = 1, Not-Stressed = 0). Feature selection and model-specific preprocessing determine the inputs used for a run.
 
 ---
 
 ## 🖥️ UI Features
 
 - Select from 32 features across 9 categories
-- Choose any of the 4 ML models for prediction
+- Choose any combination of the 4 ML models for training and evaluation
 - View metrics, confusion matrices, ROC curves and feature importance charts
 - Results auto-save to `results/runs/`
 
