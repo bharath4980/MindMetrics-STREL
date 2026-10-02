@@ -54,7 +54,7 @@ These values describe the stored run, not a fixed score for every feature select
 MindMetrics-STREL/
 ├── data/
 │   ├── raw/                 # Original CSV (STREL_raw.csv)
-│   └── processed/           # Per-fold train/test splits
+│   └── processed/           # Processed model input and earlier splits
 ├── docs/                    # Feature processing guide
 ├── notebooks/
 │   ├── eda/                 # Exploratory data analysis
@@ -83,7 +83,7 @@ MindMetrics-STREL/
 
 ### Prerequisites
 - Python 3.11 and Node.js 22 for the setup below, plus Git, pip, and npm
-- Backend dependencies are listed in `UI/backend/requirements.txt`; the frontend uses Vite 5. The old Python 3.8 / Node.js 16 setup is not compatible with these dependencies.
+- Backend dependencies are listed in `UI/backend/requirements.txt`; frontend dependencies are in `UI/frontend/package.json`.
 
 ### 1. Clone the repository
 
@@ -92,7 +92,7 @@ git clone https://github.com/bharath4980/MindMetrics-STREL.git
 cd MindMetrics-STREL
 ```
 
-> Dataset is already included at `data/raw/STREL_raw.csv`
+> The Logistic Regression workflow reads the included `data/processed/processed.xlsx`. Keep the repository's data folders in place when running the application.
 
 ### 2. Start the backend
 
